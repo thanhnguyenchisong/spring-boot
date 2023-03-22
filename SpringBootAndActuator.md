@@ -236,3 +236,4 @@ When call the discovery endpoint - It will be display as a feture of actuator.
 
 ### Extending Existing Endpoints
 Extending behavior o a predefined endpoint using the `@EndpointExtension` annotations or more concrete specialization `@EndpointWebExtension` or `@EndpointJmxExtention`
+

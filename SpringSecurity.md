@@ -209,7 +209,158 @@ Should have the timeout.
 Seesion timeout
 
 #### CSRF  and Session Timeout
+The CSRF token is stored in session. This means that, as soon as the session expires, server doesn't find an expected CSRF token and rejects the HTTP request. Some options to solve timeouts.
+- Mitigate the timeout is by using JavaScript to request a CSRF token on form submission.
+- have some JavaScript thet lets the user know their session is about to expire, user can click to button to continute and refresh the session.
+- Finally, expected CSRF token be stored in a cookie so the CSRF token outlive the session.
+
+#### Multipart (file upload)
+Chicken or the egg problem (which came first probleam)
+situation: _csrf in body => read in body => file uploaded => external web can upload a file.
 
 
+**Place CSRF Token in the Body**
+Place actual CSRF token in the body of request, the body read before authorization is performed, this mean that anyone can place temporary file on your server. However, only authorized users can submit a file that is processed by your application.
+Temprary file upload should have a negligible impact on most server.
 
+**Include CSRF Token in URL**
+But it can be leaked
 
+# Security HTTP Response Header
+
+#### Default Security HTTP response Headers
+```
+Cache-Control: no-cache, no-store, max-age=0, must-revalidate //cache the content of page in browser
+Pragma: no-cache
+Expires: 0
+X-Content-Type-Options: nosniff //all language type
+Strict-Transport-Security: max-age=31536000 ; includeSubDomains //work as https
+X-Frame-Options: DENY //disable redering pages within a iframe
+X-XSS-Protection: 0 //block content
+```
+
+# Content Security Policy (CSP)
+`Content-Security-Policy: script-src https://trustedscripts.example.com` trust the source in this header
+**Referrer Policy**
+`Referrer-Policy: same-origin` ; the source where the user was previously
+
+**Feature policy**
+enable, disable, and modify the behavior of certain APIs and web features in the browser.
+**Permissions Policy**???
+**Clear Site Data**
+`Clear-Site-Data: "cache", "cookies", "storage", "executionContexts"`  : Nice leanup action to perform on logout
+**Custom Headers**
+hooks to enable adding custom headers.
+
+# HTTP Requests
+- Redirect to HTTPs
+- Strict Transport Security : enable by default
+- Proxy Server Configuratrion
+
+# Integrations
+- Cryptography
+- Spring Data
+- Java's Concurrency APIs
+- Jackson
+- Localization
+## Cryptography
+1. Encryptors
+   - BytesEncryptor
+   - TextEncryptor
+2. Key Generators
+   - BytesKeyGenerator
+   - StringKeyGenerator
+3. Password Encoding
+## Spring Data
+**Spring Security Configuration**
+In Java Configuration, this would look like:
+```java
+@Bean
+public SecurityEvaluationContextExtension securityEvaluationContextExtension() {
+	return new SecurityEvaluationContextExtension();
+}
+```
+**Security Expressions within @Query**
+```java
+@Repository
+public interface MessageRepository extends PagingAndSortingRepository<Message,Long> {
+	@Query("select m from Message m where m.to.id = ?#{ principal?.id }")
+	Page<Message> findInbox(Pageable pageable);
+}
+```
+ check if the Authentication.getPrincipal().getId() is equal to the recipient of the Message
+
+ ## Concurrency Support
+ In most environments, Security is stored on a per Thread basis. This means that when work is done on a new Thread, the SecurityContext is lost
+ **DelegatingSecurityContextRunnable**
+ ```java
+ public void run() {
+try {
+	SecurityContextHolder.setContext(securityContext);
+	delegate.run();
+} finally {
+	SecurityContextHolder.clearContext();
+}
+```
+it makes it seamless to transfer the SecurityContext
+You can now easily transfer the SecurityContext of the current Thread to the Thread that invokes the secured service
+```java
+Runnable originalRunnable = new Runnable() {
+public void run() {
+	// invoke secured service
+}
+};
+
+SecurityContext context = SecurityContextHolder.getContext();
+DelegatingSecurityContextRunnable wrappedRunnable =
+	new DelegatingSecurityContextRunnable(originalRunnable, context);
+
+new Thread(wrappedRunnable).start();
+```
+**DelegatingSecurityContextExecutor**
+accept a delegate Execute
+
+# Spring Security Concurrency Classes
+Refer to the Javadoc for additional integrations with both the Java concurrent APIs and the Spring Task abstractions. They are quite self-explanatory once you understand the previous code.
+
+DelegatingSecurityContextCallable
+
+DelegatingSecurityContextExecutor
+
+DelegatingSecurityContextExecutorService
+
+DelegatingSecurityContextRunnable
+
+DelegatingSecurityContextScheduledExecutorService
+
+DelegatingSecurityContextSchedulingTaskExecutor
+
+DelegatingSecurityContextAsyncTaskExecutor
+
+DelegatingSecurityContextTaskExecutor
+
+DelegatingSecurityContextTaskScheduler
+
+## Jackson support
+persisting Spring Security related classes
+To use it, register the `SecurityJackson2Modules.getModules(ClassLoader)` with ObjectMapper (jackson-databind):
+```java
+ObjectMapper mapper = new ObjectMapper();
+ClassLoader loader = getClass().getClassLoader();
+List<Module> modules = SecurityJackson2Modules.getModules(loader);
+mapper.registerModules(modules);
+
+// ... use ObjectMapper as normally ...
+SecurityContext context = new SecurityContextImpl();
+// ...
+String json = mapper.writeValueAsString(context);
+```
+
+## Localization
+All exception messages can be localized
+```xml
+<bean id="messageSource"
+	class="org.springframework.context.support.ReloadableResourceBundleMessageSource">
+<property name="basename" value="classpath:org/springframework/security/messages"/>
+</bean>
+```
